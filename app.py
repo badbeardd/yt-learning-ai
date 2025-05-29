@@ -11,16 +11,24 @@ from modules.youtube_utils import get_transcript_from_url
 from modules.summarizer import summarize_transcript
 from modules.vector_store import create_vector_store, get_context_chunks
 from modules.chat_engine import get_chat_response
-import torch
-import types
-
-# Prevent Streamlit from trying to walk into torch.classes (which is broken in Windows)
-if not hasattr(torch, '__path__'):
-    torch.__path__ = types.SimpleNamespace(_path=[])
-# Set up Streamlit app
+from modules.translation import translate_text
 import os
+
+# Set up Streamlit app
 st.set_page_config(page_title="YouTube Learning Assistant", layout="wide")
 st.title("📚 YouTube Learning Assistant")
+
+# Language selector
+lang_options = {
+    "English": "en",
+    "Hindi": "hi",
+    "Bengali": "bn",
+    "Tamil": "ta",
+    "Spanish": "es",
+    "French": "fr"
+}
+lang = st.selectbox("🌐 Choose output language", options=list(lang_options.keys()))
+lang_code = lang_options[lang]
 
 # User inputs YouTube link
 yt_url = st.text_input("Paste YouTube Video URL:")
@@ -35,7 +43,8 @@ if yt_url:
 
         with st.spinner("Summarizing..."):
             summary = summarize_transcript(transcript_text)
-            st.write(summary)
+            translated_summary = translate_text(summary, lang_code)
+            st.write(translated_summary)
 
         with st.spinner("Building knowledge base for Q&A..."):
             vector_store = create_vector_store(transcript_text)
@@ -46,7 +55,8 @@ if yt_url:
         if user_query:
             with st.spinner("Thinking..."):
                 context_chunks = get_context_chunks(user_query, vector_store)
-                response = get_chat_response(user_query, context_chunks)
-                st.markdown(response)
+                response = get_chat_response(user_question=user_query, context_chunks=context_chunks)
+                translated_response = translate_text(response, lang_code)
+                st.markdown(translated_response)
     else:
         st.error("Transcript not found or unavailable for this video.")
