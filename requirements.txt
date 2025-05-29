@@ -1,0 +1,15 @@
+streamlit
+openai
+langchain
+faiss-cpu
+youtube-transcript-api
+tiktoken
+python-dotenv
+sentence-transformers
+deep_translator
+pydub
+SpeechRecognition
+gTTS
+whisper
+sentence-transformers
+openai>=1.0.0
