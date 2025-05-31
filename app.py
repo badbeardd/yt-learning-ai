@@ -32,8 +32,9 @@ lang_code = lang_options[lang]
 
 # User inputs YouTube link
 yt_url = st.text_input("Paste YouTube Video URL:")
+submit = st.button("🔍 Process Video")
 
-if yt_url:
+if yt_url and submit:
     with st.spinner("Fetching transcript..."):
         transcript_text = get_transcript_from_url(yt_url)
 
@@ -60,3 +61,4 @@ if yt_url:
                 st.markdown(translated_response)
     else:
         st.error("Transcript not found or unavailable for this video.")
+
