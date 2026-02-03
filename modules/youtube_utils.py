@@ -1,3 +1,4 @@
+import socket
 import streamlit as st
 from youtube_transcript_api import YouTubeTranscriptApi
 from urllib.parse import urlparse, parse_qs
@@ -5,17 +6,29 @@ import whisper
 import yt_dlp
 import os
 import shutil
-import socket
 
-# FORCE IPv4 (Fixes the "[Errno -5] No address" network error)
-def force_ipv4():
-    old_getaddrinfo = socket.getaddrinfo
-    def new_getaddrinfo(*args, **kwargs):
-        responses = old_getaddrinfo(*args, **kwargs)
-        return [response for response in responses if response[0] == socket.AF_INET]
-    socket.getaddrinfo = new_getaddrinfo
+# ==========================================
+# 🛠️ DNS FIX: Hardcode YouTube's Address
+# This bypasses the "[Errno -5]" Network Error
+# ==========================================
+hostname_to_ip = {
+    "www.youtube.com": "142.250.189.14",
+    "youtube.com": "142.250.189.14",
+    "m.youtube.com": "142.250.189.14",
+    "www.google.com": "142.250.189.14"
+}
 
-force_ipv4()
+_orig_getaddrinfo = socket.getaddrinfo
+
+def new_getaddrinfo(*args, **kwargs):
+    host = args[0]
+    if host in hostname_to_ip:
+        # st.write(f"DEBUG: Redirecting {host} to {hostname_to_ip[host]}")
+        return _orig_getaddrinfo(hostname_to_ip[host], *args[1:], **kwargs)
+    return _orig_getaddrinfo(*args, **kwargs)
+
+socket.getaddrinfo = new_getaddrinfo
+# ==========================================
 
 def extract_video_id(url: str) -> str:
     parsed_url = urlparse(url)
@@ -26,14 +39,12 @@ def extract_video_id(url: str) -> str:
     return None
 
 def download_audio(url, output_filename):
-    st.write("🎧 Attempting to download audio (IPv4 Forced)...")
-    
-    # 1. Force IPv4 and use a solid user agent to avoid bot detection
+    # 1. Force IPv4 and use a solid user agent
     ydl_opts = {
         'format': 'bestaudio/best',
         'outtmpl': output_filename.replace('.mp3', ''),
         'quiet': False,
-        'force_ipv4': True,  # <--- THIS FIXES THE RED ERROR
+        'force_ipv4': True,
         'socket_timeout': 15,
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
@@ -42,7 +53,7 @@ def download_audio(url, output_filename):
         }],
     }
     
-    # 2. Check for cookies (optional but good)
+    # 2. Check for cookies
     if os.path.exists("cookies.txt"):
         ydl_opts['cookiefile'] = "cookies.txt"
 
@@ -62,19 +73,15 @@ def get_transcript_from_url(url: str) -> str:
 
     # ---------- 1️⃣ Try YouTube captions ----------
     try:
-        # Tries to access the static method safely
         if hasattr(YouTubeTranscriptApi, 'get_transcript'):
             transcript = YouTubeTranscriptApi.get_transcript(video_id)
         else:
-            # Fallback for weird library versions
             transcript = YouTubeTranscriptApi().get_transcript(video_id)
-            
         return " ".join(item['text'] for item in transcript)
     except Exception as e:
         st.warning(f"⚠️ API Transcript failed. Switching to AI fallback...")
-        print(f"API Error: {e}")
 
-    # ---------- 2️⃣ Whisper fallback (Stronger) ----------
+    # ---------- 2️⃣ Whisper fallback ----------
     audio_file = f"temp_{video_id}.mp3"
     try:
         downloaded_path = download_audio(url, audio_file)
