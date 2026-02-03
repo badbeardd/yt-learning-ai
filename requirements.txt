@@ -2,7 +2,7 @@ streamlit
 openai
 langchain
 faiss-cpu
-youtube-transcript-api
+youtube-transcript-api==0.6.2
 tiktoken
 python-dotenv
 sentence-transformers
