@@ -1,3 +1,13 @@
+---
+title: YouTube Assistant
+emoji: 🤖
+colorFrom: red
+colorTo: black
+sdk: streamlit
+sdk_version: 1.25.0
+app_file: app.py
+pinned: false
+---
 # 🎓 YouTube Learning Assistant
 
 An AI-powered Streamlit web app that learns from YouTube videos by extracting transcripts, summarizing content, and enabling intelligent Q&A — with multilingual support!
