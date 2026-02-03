@@ -8,7 +8,7 @@ import os
 import shutil
 
 # ==========================================
-# 🛠️ DNS FIX + FILE SYSTEM DEBUGGER
+# 🛠️ DNS FIX (Keep this!)
 # ==========================================
 hostname_to_ip = {
     "www.youtube.com": "142.250.189.14",
@@ -26,25 +26,6 @@ def new_getaddrinfo(*args, **kwargs):
     return _orig_getaddrinfo(*args, **kwargs)
 
 socket.getaddrinfo = new_getaddrinfo
-
-def find_cookies():
-    """Searches for cookies.txt in current and parent directories"""
-    # 1. Look in current directory
-    if os.path.exists("cookies.txt"):
-        return os.path.abspath("cookies.txt")
-    
-    # 2. Look in root directory (up one level)
-    parent_path = os.path.join(os.getcwd(), "..", "cookies.txt")
-    if os.path.exists(parent_path):
-        return os.path.abspath(parent_path)
-        
-    # 3. Look in app root (common in Streamlit)
-    app_root = os.path.join(os.path.dirname(__file__), "..", "cookies.txt")
-    if os.path.exists(app_root):
-        return os.path.abspath(app_root)
-        
-    return None
-
 # ==========================================
 
 def extract_video_id(url: str) -> str:
@@ -56,23 +37,25 @@ def extract_video_id(url: str) -> str:
     return None
 
 def download_audio(url, output_filename):
-    st.write("🔍 Searching for cookies.txt...")
+    st.write("🍏 Attempting download in 'iPhone Mode' (No Cookies)...")
     
-    cookie_file = find_cookies()
-    
-    # UPDATED: Use 'best' instead of 'bestaudio' to fix "Format not available"
+    # 🛠️ iOS BYPASS CONFIGURATION
     ydl_opts = {
-        'format': 'best',  # <--- CHANGED: Download best video+audio (more reliable)
+        'format': 'bestaudio/best',
         'outtmpl': output_filename.replace('.mp3', ''),
         'quiet': False,
         'force_ipv4': True,
         'socket_timeout': 15,
-        #'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        
+        # PRETEND TO BE AN IPHONE (Bypasses many web blocks)
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'web']
+                'player_client': ['ios']
             }
         },
+        
+        # No 'cookiefile' here! We are trying anonymous mobile access.
+        
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -80,12 +63,6 @@ def download_audio(url, output_filename):
         }],
     }
     
-    if cookie_file:
-        st.success(f"🍪 Cookies found at: {cookie_file}")
-        ydl_opts['cookiefile'] = cookie_file
-    else:
-        st.error("❌ 'cookies.txt' NOT FOUND!")
-
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
