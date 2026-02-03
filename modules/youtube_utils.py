@@ -58,18 +58,16 @@ def extract_video_id(url: str) -> str:
 def download_audio(url, output_filename):
     st.write("🔍 Searching for cookies.txt...")
     
-    # DEBUG: Print current location and files
-    print(f"DEBUG: Current Dir: {os.getcwd()}")
-    print(f"DEBUG: Files here: {os.listdir()}")
-    
     cookie_file = find_cookies()
     
+    # UPDATED OPTIONS: Impersonate Chrome to bypass "Bot" check
     ydl_opts = {
         'format': 'bestaudio/best',
         'outtmpl': output_filename.replace('.mp3', ''),
         'quiet': False,
         'force_ipv4': True,
         'socket_timeout': 15,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', # <--- NEW: Fake Chrome
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -79,12 +77,9 @@ def download_audio(url, output_filename):
     
     if cookie_file:
         st.success(f"🍪 Cookies found at: {cookie_file}")
-        print(f"✅ USING COOKIES: {cookie_file}")
         ydl_opts['cookiefile'] = cookie_file
     else:
-        st.error("❌ 'cookies.txt' NOT FOUND in any folder!")
-        st.warning("Please upload 'cookies.txt' to your GitHub root.")
-        print("❌ COOKIES NOT FOUND")
+        st.error("❌ 'cookies.txt' NOT FOUND!")
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
