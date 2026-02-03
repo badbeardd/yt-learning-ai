@@ -13,3 +13,7 @@ gTTS
 whisper
 sentence-transformers
 openai>=1.0.0
+pytube
+openai-whisper
+ffmpeg-python
+torch
