@@ -2,7 +2,7 @@
 title: YouTube Assistant
 emoji: 🤖
 colorFrom: red
-colorTo: black
+colorTo: gray
 sdk: streamlit
 sdk_version: 1.25.0
 app_file: app.py
