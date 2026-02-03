@@ -5,6 +5,17 @@ import whisper
 import yt_dlp
 import os
 import shutil
+import socket
+
+# FORCE IPv4 (Fixes the "[Errno -5] No address" network error)
+def force_ipv4():
+    old_getaddrinfo = socket.getaddrinfo
+    def new_getaddrinfo(*args, **kwargs):
+        responses = old_getaddrinfo(*args, **kwargs)
+        return [response for response in responses if response[0] == socket.AF_INET]
+    socket.getaddrinfo = new_getaddrinfo
+
+force_ipv4()
 
 def extract_video_id(url: str) -> str:
     parsed_url = urlparse(url)
@@ -15,27 +26,26 @@ def extract_video_id(url: str) -> str:
     return None
 
 def download_audio(url, output_filename):
-    # Check if FFmpeg is actually installed
-    if not shutil.which("ffmpeg"):
-        st.error("🚨 CRITICAL ERROR: FFmpeg is not installed on the server. The app cannot process audio.")
-        st.info("Fix: Ensure 'packages.txt' exists in your repo root with the word 'ffmpeg' inside, then do a Factory Rebuild.")
-        return None
-
-    st.write(f"🎧 Attempting to download audio for fallback...")
+    st.write("🎧 Attempting to download audio (IPv4 Forced)...")
     
+    # 1. Force IPv4 and use a solid user agent to avoid bot detection
     ydl_opts = {
         'format': 'bestaudio/best',
+        'outtmpl': output_filename.replace('.mp3', ''),
+        'quiet': False,
+        'force_ipv4': True,  # <--- THIS FIXES THE RED ERROR
+        'socket_timeout': 15,
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
             'preferredquality': '192',
         }],
-        'outtmpl': output_filename.replace('.mp3', ''),
-        'quiet': False, # Let us see logs if needed
-        'nocheckcertificate': True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
     
+    # 2. Check for cookies (optional but good)
+    if os.path.exists("cookies.txt"):
+        ydl_opts['cookiefile'] = "cookies.txt"
+
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
@@ -50,13 +60,19 @@ def get_transcript_from_url(url: str) -> str:
         st.error("Invalid YouTube URL")
         return None
 
-    # ---------- 1️⃣ Try YouTube captions (Fastest) ----------
+    # ---------- 1️⃣ Try YouTube captions ----------
     try:
-        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        # Tries to access the static method safely
+        if hasattr(YouTubeTranscriptApi, 'get_transcript'):
+            transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        else:
+            # Fallback for weird library versions
+            transcript = YouTubeTranscriptApi().get_transcript(video_id)
+            
         return " ".join(item['text'] for item in transcript)
     except Exception as e:
-        st.warning(f"⚠️ Official Transcript API failed (likely IP block). Reason: {e}")
-        st.info("🔄 Switching to Whisper (AI Transcription)...")
+        st.warning(f"⚠️ API Transcript failed. Switching to AI fallback...")
+        print(f"API Error: {e}")
 
     # ---------- 2️⃣ Whisper fallback (Stronger) ----------
     audio_file = f"temp_{video_id}.mp3"
@@ -64,22 +80,19 @@ def get_transcript_from_url(url: str) -> str:
         downloaded_path = download_audio(url, audio_file)
         
         if not downloaded_path or not os.path.exists(downloaded_path):
-            return None # Error already printed in download_audio
+            return None
 
-        st.success("✅ Audio downloaded! Starting AI transcription (this takes 30-60s)...")
-        
-        # Load model
+        st.success("✅ Audio downloaded! Starting Whisper transcription...")
         model = whisper.load_model("base")
         result = model.transcribe(downloaded_path)
 
-        # Cleanup
         if os.path.exists(downloaded_path):
             os.remove(downloaded_path)
             
         return result["text"]
 
     except Exception as e:
-        st.error(f"🛑 Whisper Transcription Failed: {str(e)}")
+        st.error(f"🛑 Whisper Failed: {str(e)}")
         if os.path.exists(audio_file):
             os.remove(audio_file)
         return None
