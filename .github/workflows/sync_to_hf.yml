@@ -16,4 +16,4 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         # This pushes your code to your specific Hugging Face Space
-        run: git push https://Suraz90:$HF_TOKEN@huggingface.co/spaces/Suraz90/YouTubeAssistant main
+        run: git push --force https://Suraz90:$HF_TOKEN@huggingface.co/spaces/Suraz90/YouTubeAssistant main
