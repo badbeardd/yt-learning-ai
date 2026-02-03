@@ -1,33 +1,35 @@
 import os
 from huggingface_hub import InferenceClient
 
-# 1. Connect to Hugging Face (uses the HF_TOKEN you just added)
+# 1. Connect to Hugging Face Free API
 client = InferenceClient(token=os.getenv("HF_TOKEN"))
 
 def summarize_transcript(text: str) -> str:
-    """Summarize transcript using Hugging Face Free API."""
+    """Summarize transcript using Hugging Face Free API (Chat Mode)."""
     
-    # 2. Safety: Trim text to ~4000 chars so we don't hit the free limit
+    # Trim text to prevent errors
     safe_text = text[:4000]
 
-    prompt = f"""
-    [INST] You are a helpful assistant. Summarize the following YouTube transcript into 5-7 concise bullet points.
-    
-    TRANSCRIPT:
-    {safe_text}
-    [/INST]
-    """
+    # 2. Define the Message (Chat Format)
+    # The API requires a list of messages, not just a string prompt.
+    messages = [
+        {
+            "role": "user", 
+            "content": f"Summarize the following YouTube transcript into 5-7 concise bullet points:\n\nTRANSCRIPT:\n{safe_text}"
+        }
+    ]
     
     try:
-        # 3. Use Mistral-7B (Fast & Free)
-        response = client.text_generation(
-            prompt,
-            model="mistralai/Mistral-7B-Instruct-v0.3",
-            max_new_tokens=500,
-            temperature=0.5,
-            return_full_text=False
+        # 3. Call the Chat Completion API
+        response = client.chat_completion(
+            messages=messages,
+            model="mistralai/Mistral-7B-Instruct-v0.3", 
+            max_tokens=500,
+            temperature=0.5
         )
-        return response.strip()
+        
+        # 4. Extract the answer
+        return response.choices[0].message.content
 
     except Exception as e:
-        return f"Error in summarization (Free HF API): {str(e)}"
+        return f"Error in summarization: {str(e)}"
