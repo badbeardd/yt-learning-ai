@@ -4,15 +4,14 @@ import requests
 def summarize_transcript(text: str) -> str:
     """Summarize using the dedicated BART model via raw API request."""
     
-    # 1. API Endpoint (Direct Link to the Model)
-    api_url = "https://api-inference.huggingface.co/models/facebook/bart-large-cnn"
+    # 1. NEW API Endpoint (Updated to 'router.huggingface.co')
+    # The old 'api-inference' URL is deprecated. This is the new standard.
+    api_url = "https://router.huggingface.co/models/facebook/bart-large-cnn"
     
     # 2. Authentication
     headers = {"Authorization": f"Bearer {os.getenv('HF_TOKEN')}"}
     
     # 3. Payload
-    # We send the text and parameters as raw JSON. 
-    # This bypasses the 'unexpected keyword' errors you were seeing.
     payload = {
         "inputs": text[:3000], # Keep text short enough for the model
         "parameters": {
@@ -27,12 +26,12 @@ def summarize_transcript(text: str) -> str:
         response = requests.post(api_url, headers=headers, json=payload)
         output = response.json()
         
-        # 5. Handle "Model Loading" or other API errors
+        # 5. Handle "Model Loading" 
+        # (If the model is asleep, it returns an error saying "loading". We catch that.)
         if isinstance(output, dict) and "error" in output:
-            return f"⚠️ API Status: {output['error']} (Try again in 20 seconds)"
+            return f"⚠️ API Status: {output['error']} (Wait 30s and try again - Model is waking up)"
             
         # 6. Success!
-        # The API returns a list: [{'summary_text': '...'}]
         if isinstance(output, list) and len(output) > 0:
             return output[0].get('summary_text', "No summary returned.")
             
