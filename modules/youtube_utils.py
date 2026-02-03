@@ -8,8 +8,7 @@ import os
 import shutil
 
 # ==========================================
-# 🛠️ DNS FIX: Hardcode YouTube's Address
-# This bypasses the "[Errno -5]" Network Error
+# 🛠️ DNS FIX + FILE SYSTEM DEBUGGER
 # ==========================================
 hostname_to_ip = {
     "www.youtube.com": "142.250.189.14",
@@ -23,11 +22,29 @@ _orig_getaddrinfo = socket.getaddrinfo
 def new_getaddrinfo(*args, **kwargs):
     host = args[0]
     if host in hostname_to_ip:
-        # st.write(f"DEBUG: Redirecting {host} to {hostname_to_ip[host]}")
         return _orig_getaddrinfo(hostname_to_ip[host], *args[1:], **kwargs)
     return _orig_getaddrinfo(*args, **kwargs)
 
 socket.getaddrinfo = new_getaddrinfo
+
+def find_cookies():
+    """Searches for cookies.txt in current and parent directories"""
+    # 1. Look in current directory
+    if os.path.exists("cookies.txt"):
+        return os.path.abspath("cookies.txt")
+    
+    # 2. Look in root directory (up one level)
+    parent_path = os.path.join(os.getcwd(), "..", "cookies.txt")
+    if os.path.exists(parent_path):
+        return os.path.abspath(parent_path)
+        
+    # 3. Look in app root (common in Streamlit)
+    app_root = os.path.join(os.path.dirname(__file__), "..", "cookies.txt")
+    if os.path.exists(app_root):
+        return os.path.abspath(app_root)
+        
+    return None
+
 # ==========================================
 
 def extract_video_id(url: str) -> str:
@@ -39,7 +56,14 @@ def extract_video_id(url: str) -> str:
     return None
 
 def download_audio(url, output_filename):
-    # 1. Force IPv4 and use a solid user agent
+    st.write("🔍 Searching for cookies.txt...")
+    
+    # DEBUG: Print current location and files
+    print(f"DEBUG: Current Dir: {os.getcwd()}")
+    print(f"DEBUG: Files here: {os.listdir()}")
+    
+    cookie_file = find_cookies()
+    
     ydl_opts = {
         'format': 'bestaudio/best',
         'outtmpl': output_filename.replace('.mp3', ''),
@@ -53,9 +77,14 @@ def download_audio(url, output_filename):
         }],
     }
     
-    # 2. Check for cookies
-    if os.path.exists("cookies.txt"):
-        ydl_opts['cookiefile'] = "cookies.txt"
+    if cookie_file:
+        st.success(f"🍪 Cookies found at: {cookie_file}")
+        print(f"✅ USING COOKIES: {cookie_file}")
+        ydl_opts['cookiefile'] = cookie_file
+    else:
+        st.error("❌ 'cookies.txt' NOT FOUND in any folder!")
+        st.warning("Please upload 'cookies.txt' to your GitHub root.")
+        print("❌ COOKIES NOT FOUND")
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
