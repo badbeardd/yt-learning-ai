@@ -1,19 +1,15 @@
 import socket
 import streamlit as st
-from youtube_transcript_api import YouTubeTranscriptApi
+import requests
+import re
 from urllib.parse import urlparse, parse_qs
-import whisper
-import yt_dlp
 import os
-import shutil
 
 # ==========================================
-# 🛠️ CRITICAL DNS FIX (The Recursion Killer)
+# 🛠️ DNS FIX (Keep to prevent recursion crash)
 # ==========================================
-# 1. Save the ORIGINAL function first
 _orig_getaddrinfo = socket.getaddrinfo
 
-# 2. Define the new logic
 def new_getaddrinfo(*args, **kwargs):
     hostname_to_ip = {
         "www.youtube.com": "142.250.189.14",
@@ -22,24 +18,12 @@ def new_getaddrinfo(*args, **kwargs):
         "www.google.com": "142.250.189.14"
     }
     host = args[0]
-    # If it's YouTube, use the forced IP
     if host in hostname_to_ip:
         return _orig_getaddrinfo(hostname_to_ip[host], *args[1:], **kwargs)
-    
-    # Otherwise, use the ORIGINAL function (not this one!)
     return _orig_getaddrinfo(*args, **kwargs)
 
-# 3. Apply the patch
 socket.getaddrinfo = new_getaddrinfo
 # ==========================================
-
-def find_cookies():
-    """Locate the cookies.txt file"""
-    if os.path.exists("cookies.txt"): return os.path.abspath("cookies.txt")
-    if os.path.exists("../cookies.txt"): return os.path.abspath("../cookies.txt")
-    # Also check /app directory for cloud deployments
-    if os.path.exists("/app/cookies.txt"): return "/app/cookies.txt"
-    return None
 
 def extract_video_id(url: str) -> str:
     parsed_url = urlparse(url)
@@ -53,56 +37,65 @@ def get_transcript_from_url(url: str) -> str:
         st.error("Invalid YouTube URL")
         return None
 
-    cookie_file = find_cookies()
-    
-    # ---------- 1️⃣ Try YouTube Captions (Text-First Strategy) ----------
-    # This is the "Silver Bullet". Text API often skips IP blocks if cookies are present.
-    try:
-        if cookie_file:
-            st.info("🔓 Attempting authenticated transcript fetch...")
-            transcript = YouTubeTranscriptApi.get_transcript(video_id, cookies=cookie_file)
-        else:
-            transcript = YouTubeTranscriptApi.get_transcript(video_id)
+    st.info("🔄 Cloud IP blocked. Attempting to route via Invidious Network...")
+
+    # List of public Invidious instances (Volunteer proxies)
+    # We try them one by one until one works.
+    instances = [
+        "https://inv.tux.pizza",
+        "https://invidious.jing.rocks",
+        "https://vid.ufficiozero.org",
+        "https://invidious.nerdvpn.de",
+        "https://inv.zzls.xyz"
+    ]
+
+    for instance in instances:
+        try:
+            # 1. Ask Invidious for the video info to find caption tracks
+            # Endpoint: /api/v1/videos/{video_id}
+            api_url = f"{instance}/api/v1/videos/{video_id}"
+            response = requests.get(api_url, timeout=5)
             
-        return " ".join(item['text'] for item in transcript)
-        
-    except Exception as e:
-        st.warning(f"⚠️ Text Transcript failed. Switching to Audio Fallback... Error: {e}")
+            if response.status_code != 200:
+                continue
 
-    # ---------- 2️⃣ Whisper Fallback (Audio Download) ----------
-    return download_and_transcribe_audio(url, video_id, cookie_file)
-
-def download_and_transcribe_audio(url, video_id, cookie_file):
-    audio_file = f"temp_{video_id}.mp3"
-    
-    st.write("🍏 Attempting download in 'iPhone Mode'...")
-
-    # iPhone Mode + Cookies = Maximum Strength
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': audio_file.replace('.mp3', ''),
-        'quiet': False,
-        'force_ipv4': True,
-        'socket_timeout': 15,
-        'extractor_args': {'youtube': {'player_client': ['ios']}}, 
-        'postprocessors': [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '192'}],
-    }
-
-    if cookie_file: 
-        ydl_opts['cookiefile'] = cookie_file
-
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+            data = response.json()
+            captions = data.get("captions", [])
             
-        st.success("✅ Audio downloaded! Starting Whisper transcription...")
-        model = whisper.load_model("base")
-        result = model.transcribe(audio_file)
-        
-        if os.path.exists(audio_file): os.remove(audio_file)
-        return result["text"]
+            # 2. Find an English caption track
+            selected_caption = None
+            for cap in captions:
+                if "en" in cap["languageCode"]:
+                    selected_caption = cap["url"] # This is a relative URL
+                    break
+            
+            if not selected_caption:
+                continue
 
-    except Exception as e:
-        st.error(f"🛑 All download methods failed. The Data Center IP is likely hard-blocked. Error: {str(e)}")
-        if os.path.exists(audio_file): os.remove(audio_file)
-        return None
+            # 3. Download the actual text (VTT format)
+            # The URL provided by Invidious is usually relative, so we prepend the instance URL
+            full_cap_url = f"{instance}{selected_caption}"
+            transcript_response = requests.get(full_cap_url, timeout=5)
+            
+            if transcript_response.status_code == 200:
+                # 4. Clean the VTT format (remove timestamps like 00:00:01.000)
+                raw_text = transcript_response.text
+                # Simple regex to remove VTT timestamps and header
+                clean_lines = []
+                for line in raw_text.splitlines():
+                    if "-->" in line or line == "WEBVTT" or not line.strip():
+                        continue
+                    clean_lines.append(line.strip())
+                
+                final_text = " ".join(clean_lines)
+                st.success(f"✅ Success! Transcript fetched via {instance}")
+                return final_text
+
+        except Exception as e:
+            print(f"Failed on {instance}: {e}")
+            continue
+
+    st.error("🛑 All Invidious proxies failed. YouTube is blocking this video strictly.")
+    return None
+
+# (Deleted download_audio entirely as it is useless on blocked IP)
