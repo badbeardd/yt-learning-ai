@@ -16,30 +16,33 @@ def get_transcript_from_url(url: str) -> str:
 
     st.info("🔄 Fetching transcript via RapidAPI (Solid API)...")
 
-    # 1. Your Credentials (From your screenshot)
+    # 1. Credentials
     url = "https://youtube-transcript3.p.rapidapi.com/api/transcript"
-    
     querystring = {"videoId": video_id}
-
     headers = {
         "x-rapidapi-key": "4c87c54e7bmsh37692be715c85a9p116869jsn8282bbb7c1a1",
         "x-rapidapi-host": "youtube-transcript3.p.rapidapi.com"
     }
 
-    # 2. Call the External API
     try:
         response = requests.get(url, headers=headers, params=querystring, timeout=15)
         
         if response.status_code == 200:
             data = response.json()
             
-            # The API returns: { "title": "...", "lines": [ {"text": "...", "start": ...} ] }
+            # 🔍 DEBUG: Print the raw data to the screen so we can see the structure
+            st.write("🔍 **API RAW RESPONSE:**")
+            st.json(data) 
+            
+            # Attempt to parse based on common formats
             if "lines" in data:
-                full_text = " ".join([item['text'] for item in data['lines']])
-                st.success("✅ Success! Transcript fetched.")
-                return full_text
+                return " ".join([item['text'] for item in data['lines']])
+            elif "content" in data:
+                return " ".join([item['text'] for item in data['content']])
+            elif "transcript" in data:
+                 return " ".join([item['text'] for item in data['transcript']])
             else:
-                st.error("❌ API returned no lines. Video might not have captions.")
+                st.error("❌ Valid connection, but couldn't find transcript text in response. See DEBUG above.")
                 return None
 
         elif response.status_code == 403:
