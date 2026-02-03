@@ -1,44 +1,32 @@
 import os
-import requests
+from openai import OpenAI
+
+# 1. Setup Client for Groq (Free & Fast)
+client = OpenAI(
+    api_key=os.getenv("GROQ_API_KEY"),
+    base_url="https://api.groq.com/openai/v1"
+)
 
 def summarize_transcript(text: str) -> str:
-    API_URL = "https://router.huggingface.co/hf-inference/models/facebook/bart-large-cnn"
+    """Summarize using Groq (Llama 3)."""
     
-    token = os.getenv("HF_TOKEN")
-    if not token:
-        return "❌ Error: HF_TOKEN is missing. Check your Space Settings."
-
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "inputs": text[:3000],
-        "parameters": {
-            "do_sample": False
-        }
-    }
+    # 2. Safety: Groq handles ~6000 chars easily
+    safe_text = text[:6000]
 
     try:
-        response = requests.post(
-            API_URL,
-            headers=headers,
-            json=payload,
-            timeout=30
+        # 3. Call Llama 3 (Smartest open model)
+        response = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that summarizes videos."},
+                {"role": "user", "content": f"Summarize this transcript in 5-7 concise bullet points:\n\n{safe_text}"}
+            ],
+            temperature=0.5,
+            max_tokens=500
         )
-
-        if response.status_code == 200:
-            output = response.json()
-            if isinstance(output, list) and len(output) > 0:
-                return output[0].get("summary_text", "No summary returned.")
-            return f"Unexpected response: {output}"
-
-        elif response.status_code == 503:
-            return "⏳ Model is loading. Wait ~30 seconds and retry."
-
-        else:
-            return f"❌ API Error ({response.status_code}): {response.text}"
+        
+        # 4. Return the summary
+        return response.choices[0].message.content
 
     except Exception as e:
-        return f"🛑 Connection Error: {str(e)}"
+        return f"Summarization Error: {str(e)}"
