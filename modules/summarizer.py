@@ -5,14 +5,16 @@ from huggingface_hub import InferenceClient
 client = InferenceClient(token=os.getenv("HF_TOKEN"))
 
 def summarize_transcript(text: str) -> str:
-    """Summarize transcript using Hugging Face Free API (Chat Mode)."""
+    """Summarize transcript using Hugging Face Free API (Zephyr-7B)."""
     
     # Trim text to prevent errors
     safe_text = text[:4000]
 
-    # 2. Define the Message (Chat Format)
-    # The API requires a list of messages, not just a string prompt.
     messages = [
+        {
+            "role": "system",
+            "content": "You are a helpful assistant that summarizes videos."
+        },
         {
             "role": "user", 
             "content": f"Summarize the following YouTube transcript into 5-7 concise bullet points:\n\nTRANSCRIPT:\n{safe_text}"
@@ -20,15 +22,16 @@ def summarize_transcript(text: str) -> str:
     ]
     
     try:
-        # 3. Call the Chat Completion API
+        # 2. Use Zephyr-7B-Beta (Reliable Chat Model)
+        # This model is specifically optimized for the 'chat_completion' endpoint
         response = client.chat_completion(
             messages=messages,
-            model="mistralai/Mistral-7B-Instruct-v0.3", 
+            model="HuggingFaceH4/zephyr-7b-beta", 
             max_tokens=500,
             temperature=0.5
         )
         
-        # 4. Extract the answer
+        # 3. Extract the answer
         return response.choices[0].message.content
 
     except Exception as e:
