@@ -16,4 +16,4 @@ openai>=1.0.0
 openai-whisper
 ffmpeg-python
 torch
-yt-dlp
+yt-dlp @ git+https://github.com/yt-dlp/yt-dlp.git@master
