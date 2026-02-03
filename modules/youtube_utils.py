@@ -60,14 +60,14 @@ def download_audio(url, output_filename):
     
     cookie_file = find_cookies()
     
-    # UPDATED OPTIONS: Impersonate Chrome to bypass "Bot" check
+    # UPDATED: Use 'best' instead of 'bestaudio' to fix "Format not available"
     ydl_opts = {
-        'format': 'bestaudio/best',
+        'format': 'best',  # <--- CHANGED: Download best video+audio (more reliable)
         'outtmpl': output_filename.replace('.mp3', ''),
         'quiet': False,
         'force_ipv4': True,
         'socket_timeout': 15,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', # <--- NEW: Fake Chrome
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
