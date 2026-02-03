@@ -1,24 +1,33 @@
-from openai import OpenAI
 import os
-from dotenv import load_dotenv
+from huggingface_hub import InferenceClient
 
-load_dotenv()
-
-client = OpenAI(
-    api_key=os.getenv("TOGETHER_API_KEY"),
-    base_url="https://api.together.xyz/v1"
-)
+# 1. Connect to Hugging Face (uses the HF_TOKEN you just added)
+client = InferenceClient(token=os.getenv("HF_TOKEN"))
 
 def summarize_transcript(text: str) -> str:
-    """Summarize transcript using Together API and Mixtral."""
-    prompt = f"Summarize the following video transcript in 5-7 concise bullet points:\n\n{text[:3000]}"
+    """Summarize transcript using Hugging Face Free API."""
+    
+    # 2. Safety: Trim text to ~4000 chars so we don't hit the free limit
+    safe_text = text[:4000]
+
+    prompt = f"""
+    [INST] You are a helpful assistant. Summarize the following YouTube transcript into 5-7 concise bullet points.
+    
+    TRANSCRIPT:
+    {safe_text}
+    [/INST]
+    """
     
     try:
-        response = client.chat.completions.create(
-            model="mistralai/Mixtral-8x7B-Instruct-v0.1",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.5
+        # 3. Use Mistral-7B (Fast & Free)
+        response = client.text_generation(
+            prompt,
+            model="mistralai/Mistral-7B-Instruct-v0.3",
+            max_new_tokens=500,
+            temperature=0.5,
+            return_full_text=False
         )
-        return response.choices[0].message.content.strip()
+        return response.strip()
+
     except Exception as e:
-        return f"Error in summarization: {e}"
+        return f"Error in summarization (Free HF API): {str(e)}"
