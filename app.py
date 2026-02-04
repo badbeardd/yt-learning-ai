@@ -44,6 +44,9 @@ lang_code = lang_options[lang]
 # ----------------------------
 yt_url = st.text_input("Paste YouTube Video URL:")
 submit = st.button("🔍 Process Video")
+if submit:
+    st.session_state.chat_history = []
+
 
 if yt_url and submit:
     with st.spinner("Fetching transcript..."):
