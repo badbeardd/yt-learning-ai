@@ -80,12 +80,15 @@ if yt_url and submit:
             with st.spinner("Thinking..."):
 
                 # 🔑 Follow-up–aware retrieval
-                if st.session_state.chat_history:
-                    augmented_query = (
-                        st.session_state.chat_history[-1]["question"]
-                        + " "
-                        + user_query
-                    )
+                last_turn = st.session_state.chat_history[-1]
+                augmented_query = (
+                    last_turn["question"]
+                    + " "
+                    + last_turn["answer"]
+                    + " "
+                    + user_query
+                )
+
                 else:
                     augmented_query = user_query
 
