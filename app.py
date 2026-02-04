@@ -2,7 +2,6 @@ import sys
 import types
 import torch
 
-# Patch torch.classes to prevent Streamlit from inspecting it
 sys.modules['torch.classes'] = types.ModuleType('torch.classes')
 torch.classes = sys.modules['torch.classes']
 
@@ -14,16 +13,25 @@ from modules.chat_engine import get_chat_response
 from modules.translation import translate_text
 
 # ----------------------------
-# Streamlit App Configuration
+# App Config
 # ----------------------------
 st.set_page_config(page_title="YouTube Learning Assistant", layout="wide")
 st.title("📚 YouTube Learning Assistant")
 
 # ----------------------------
-# Initialize Chat Memory
+# State Init
 # ----------------------------
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
+
+if "vector_store" not in st.session_state:
+    st.session_state.vector_store = None
+
+if "video_ready" not in st.session_state:
+    st.session_state.video_ready = False
+
+if "transcript_text" not in st.session_state:
+    st.session_state.transcript_text = None
 
 # ----------------------------
 # Language Selector
@@ -36,83 +44,66 @@ lang_options = {
     "Spanish": "es",
     "French": "fr"
 }
-lang = st.selectbox("🌐 Choose output language", options=list(lang_options.keys()))
+lang = st.selectbox("🌐 Choose output language", list(lang_options.keys()))
 lang_code = lang_options[lang]
 
 # ----------------------------
-# YouTube URL Input
+# Video Processing
 # ----------------------------
 yt_url = st.text_input("Paste YouTube Video URL:")
 submit = st.button("🔍 Process Video")
-if submit:
+
+if submit and yt_url:
     st.session_state.chat_history = []
+    st.session_state.video_ready = False
 
-
-if yt_url and submit:
     with st.spinner("Fetching transcript..."):
         transcript_text = get_transcript_from_url(yt_url)
 
     if transcript_text:
-        st.success("Transcript fetched!")
+        st.session_state.transcript_text = transcript_text
 
-        # ----------------------------
-        # Transcript Summary
-        # ----------------------------
-        st.subheader("📝 Transcript Summary")
         with st.spinner("Summarizing..."):
             summary = summarize_transcript(transcript_text)
-            translated_summary = translate_text(summary, lang_code)
-            st.write(translated_summary)
+            st.write(translate_text(summary, lang_code))
 
-        # ----------------------------
-        # Vector Store Creation
-        # ----------------------------
-        with st.spinner("Building knowledge base for Q&A..."):
+        with st.spinner("Building knowledge base..."):
             st.session_state.vector_store = create_vector_store(transcript_text)
-            st.session_state.transcript_loaded = True
-
-
-        # ----------------------------
-        # Conversational Q&A
-        # ----------------------------
-        st.subheader("💬 Ask Questions")
-        user_query = st.text_input("Ask anything about the video content")
-
-        if user_query:
-            with st.spinner("Thinking..."):
-
-                # 🔑 Follow-up–aware retrieval
-                # 🔑 Follow-up–aware retrieval
-                if st.session_state.chat_history:
-                    last_turn = st.session_state.chat_history[-1]
-                    augmented_query = (
-                        last_turn["question"]
-                        + " "
-                        + last_turn["answer"]
-                        + " "
-                        + user_query
-                    )
-                else:
-                    augmented_query = user_query
-
-
-                context_chunks =context_chunks = get_context_chunks(
-                            augmented_query,
-                            st.session_state.vector_store)
-
-                response = get_chat_response(
-                    user_question=user_query,
-                    context_chunks=context_chunks,
-                    chat_history=st.session_state.chat_history
-                )
-
-                # Store conversation
-                st.session_state.chat_history.append(
-                    {"question": user_query, "answer": response}
-                )
-
-                translated_response = translate_text(response, lang_code)
-                st.markdown(translated_response)
-
+            st.session_state.video_ready = True
     else:
-        st.error("Transcript not found or unavailable for this video.")
+        st.error("Transcript not found.")
+
+# ----------------------------
+# Conversational Q&A
+# ----------------------------
+if st.session_state.video_ready:
+    st.subheader("💬 Ask Questions")
+    user_query = st.text_input("Ask anything about the video")
+
+    if user_query:
+        with st.spinner("Thinking..."):
+
+            if st.session_state.chat_history:
+                last = st.session_state.chat_history[-1]
+                augmented_query = (
+                    last["question"] + " " + last["answer"] + " " + user_query
+                )
+            else:
+                augmented_query = user_query
+
+            context_chunks = get_context_chunks(
+                augmented_query,
+                st.session_state.vector_store
+            )
+
+            response = get_chat_response(
+                user_question=user_query,
+                context_chunks=context_chunks,
+                chat_history=st.session_state.chat_history
+            )
+
+            st.session_state.chat_history.append(
+                {"question": user_query, "answer": response}
+            )
+
+            st.markdown(translate_text(response, lang_code))
