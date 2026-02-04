@@ -68,7 +68,9 @@ if yt_url and submit:
         # Vector Store Creation
         # ----------------------------
         with st.spinner("Building knowledge base for Q&A..."):
-            vector_store = create_vector_store(transcript_text)
+            st.session_state.vector_store = create_vector_store(transcript_text)
+            st.session_state.transcript_loaded = True
+
 
         # ----------------------------
         # Conversational Q&A
@@ -94,9 +96,9 @@ if yt_url and submit:
                     augmented_query = user_query
 
 
-                context_chunks = get_context_chunks(
-                    augmented_query, vector_store
-                )
+                context_chunks =context_chunks = get_context_chunks(
+                            augmented_query,
+                            st.session_state.vector_store)
 
                 response = get_chat_response(
                     user_question=user_query,
