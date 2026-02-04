@@ -80,17 +80,19 @@ if yt_url and submit:
             with st.spinner("Thinking..."):
 
                 # 🔑 Follow-up–aware retrieval
-                last_turn = st.session_state.chat_history[-1]
-                augmented_query = (
-                    last_turn["question"]
-                    + " "
-                    + last_turn["answer"]
-                    + " "
-                    + user_query
-                )
-
+                # 🔑 Follow-up–aware retrieval
+                if st.session_state.chat_history:
+                    last_turn = st.session_state.chat_history[-1]
+                    augmented_query = (
+                        last_turn["question"]
+                        + " "
+                        + last_turn["answer"]
+                        + " "
+                        + user_query
+                    )
                 else:
                     augmented_query = user_query
+
 
                 context_chunks = get_context_chunks(
                     augmented_query, vector_store
