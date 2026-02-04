@@ -54,11 +54,29 @@ if yt_url and submit:
         user_query = st.text_input("Ask anything about the video content")
 
         if user_query:
-            with st.spinner("Thinking..."):
-                context_chunks = get_context_chunks(user_query, vector_store)
-                response = get_chat_response(user_question=user_query, context_chunks=context_chunks)
-                translated_response = translate_text(response, lang_code)
-                st.markdown(translated_response)
-    else:
-        st.error("Transcript not found or unavailable for this video.")
+    with st.spinner("Thinking..."):
 
+        # 🔑 make retrieval follow-up aware
+        if st.session_state.chat_history:
+            augmented_query = (
+                st.session_state.chat_history[-1]["question"]
+                + " "
+                + user_query
+            )
+        else:
+            augmented_query = user_query
+
+        context_chunks = get_context_chunks(augmented_query, vector_store)
+
+        response = get_chat_response(
+            user_question=user_query,
+            context_chunks=context_chunks,
+            chat_history=st.session_state.chat_history
+        )
+
+        st.session_state.chat_history.append(
+            {"question": user_query, "answer": response}
+        )
+
+        translated_response = translate_text(response, lang_code)
+        st.markdown(translated_response)
